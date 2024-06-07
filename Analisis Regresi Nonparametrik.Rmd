@@ -1,0 +1,250 @@
+---
+author: "Syahlla"
+output: html_document
+---
+
+```{r}
+data=manufacturing
+df = manufacturing
+head(data)
+```
+```{r}
+plot(data$Temperature..Â.C.,data$Quality.Rating)
+```
+
+
+
+
+SPLINE TRUNCATED
+```{r}
+
+x <- data$`Umur (bln)`
+y <- data$Rasio
+
+#mencari gcv
+gcv1<-function(y,x,m,l)
+{
+  a<-min(x)+1
+  b<-max(x)-1
+  k<-seq(a,b,l)
+  v<-length(k)
+  n<-length(y)
+  Gcv<-matrix(nrow=v,ncol=1)
+  Mse<-matrix(nrow=v,ncol=1)
+  for (j in 1:v)
+  {
+    w<-matrix(0,ncol=m+1,nrow=n)
+    for (i in 1:m)
+      w[,i]<-x^(i-1)
+    for (i in m+1)
+      w[,i]<-trun(x,k[j],m-1)
+    wtw<- t(w) %*% w
+    z<- MPL(wtw) 
+    beta<- z %*% (t(w) %*% y)
+    h<- w %*% z %*% t(w)
+    mu<-w%*%beta
+    MSE<- t(y-mu) %*% (y-mu)/n
+    I<-matrix(0,ncol=n,nrow=n)
+    for(i in 1: n)
+      I[i,i]<-1
+    GCV<-(n^2*MSE)/(sum(diag(I-h)))^2
+    Gcv[j]<-GCV
+    Mse[j]<-MSE
+  }
+  R<-matrix(c(k,Gcv,Mse),ncol=3)
+  sort.R<-R[order(R[,2]),]
+  S<-sort.R[1:10,]
+  cat("Untuk spline order",m,"dengan 1 titik knot, diperoleh knot optimal=",S[1,1]," dengan GCV minimum=",S[1,2],"dan MSE =",S[1,3])
+  cat("\nBerikut 10 nilai GCV terkecil, nilai MSE dan letak titik knotnya:\n")
+  cat("====================================\n")
+  cat("  No  Ttk knot   GCV     MSE   \n")
+  cat("====================================\n")
+  S
+}
+
+
+gcv1(y,x,4,1)
+```
+```{r}
+#plot spline
+model.spline=function(prediktor,respon,m,knots=c(...))
+{
+  y<-respon
+  n<-length(y)
+  k<-length(knots)
+  w<-matrix(0, ncol=m+k, nrow=n)
+  for (i in 1:m)
+    w[,i]<-prediktor^(i-1)
+  for(i in (m+1):(m+k))
+    w[,i]<-turn(prediktor,knots[i-m],m-1)
+  wtw<-t(w)%*%w
+  Z<-MPL(wtw)
+  beta<-Z%*%t(w)%*%y
+  yfits<-w%*%beta
+  res<-y-yfits
+  MSE<-t(y-yfits)%*%(y-yfits)/n
+  R_squared <- 1 - sum(res^2) / sum((y - mean(y))^2)
+  I<-matrix(0,ncol=n,nrow=n)
+  for(i in 1:n)
+    I[i,i]<-1
+  h<-w%*%MPL(wtw)%*%t(w)
+  GCV<-(n^2*MSE)/(sum(diag(I-h)))^2
+  q<-seq(min(prediktor),max(prediktor),length=1000)
+  u<-matrix(0,ncol=m+k,nrow=1000)
+  cat("\n Spline orde",m)
+  cat("\n Titik Knots  = c( ",format(knots),")")
+  cat("\n Nilai GCV    = ",format(GCV),
+      "\n Nilai MSE    = ",format(MSE),
+      "\n Nilai R-squared = ", format(R_squared), "\n")
+  cat("\n ******************************************************************")
+  cat("\n      Koefisen         Estimasi")
+  cat("\n ******************************************************************")
+  for(i in 1:(m+k))
+    cat("\n     beta[",i-1,"]          ",format(beta[i]))
+  cat("\n ******************************************************************")
+  par(mfrow=c(1,1))
+  z0=cbind(prediktor,respon)
+  z1=z0[order(z0[,1]),]
+  x1=z1[,1]
+  y1=z1[,2]
+  w1<-matrix(0, ncol=m+k, nrow=n)
+  for (i in 1:m)
+    w1[,i]<-x1^(i-1)
+  for(i in (m+1):(m+k))
+    w1[,i]<-trun(x1,knots[i-m],m-1)
+  yfits1<-w1%*%beta
+  plot(x1,y1, type="p",xlim=c(min(prediktor),max(prediktor)),ylim=c(180,220),
+       xlab="Temperature",ylab="Quality Rating")
+  par(new=T)
+  print(z0)
+  # print(yfits1)
+  plot(x1,yfits1, type="l",col="red",
+       # xlim=c(min(prediktor),max(prediktor)),
+       # ylim=c(0,22),
+       xlab="  ",ylab="  ")
+  # plot(x1,yfits1)
+  plot(x, y, xlim = c(min(prediktor), max(prediktor)), xlab = "Temperature", ylab = "Quality Rating")
+  # Tambahkan plot garis di atas latar belakang
+  lines(x1, yfits1, type = "l", col = "red", lwd = 2) 
+}
+
+model.spline(x,y,4, c(275))
+```
+Metode spline truncated menghasilkan model regresi spline truncated, dengan orde spline sebesar 4 dan mendapatkan nilai titik knot sebesar 275. Plot hasil regresi spline truncated dengan knot pada nilai tersebut memberikan gambaran yang kaya tentang hubungan antara variabel independen dan dependen. Titik potong pada sumbu vertikal menunjukkan nilai respons ketika variabel independen berada pada nilai nol atau di awal interval. Kemudian didapatkan nilai R-square sebesar 0,99 yang menunjukkan bahwa variabel independen x menyumbang sekitar 99% variabilitas variabel dependen y dengan menggunakan model regresi spline truncated ini. Karena nilai R-square terbilang sangat tinggi, ini menunjukkan bahwa model regresi spline truncated dapat menjelaskan dengan sangat baik hubungan antara x dan y. Hal tersebut dibuktikan dengan plot yang dihasilkan, dimana plot data mengikuti garis yang dihasilkan oleh regresi spline truncated.
+
+```{r}
+Y = data$Quality.Rating
+X = data$Temperature..Â.C.
+```
+
+REGRESI KERNEL
+```{r}
+kreg1 = ksmooth(x=X, y=Y, kernel="normal", bandwidth = 0.01)
+kreg2 = ksmooth(x=X, y=Y, kernel="normal", bandwidth = 0.03)
+kreg3 = ksmooth(x=X, y=Y, kernel="normal", bandwidth = 0.07)
+```
+
+```{r}
+plot(X,Y,pch=20,main="Perbandingan Bandwidth")
+lines(kreg1, lwd=3, col='orange')
+lines(kreg2, lwd=3, col='purple')
+lines(kreg3, lwd=3, col='limegreen')
+legend("bottomleft", c("h=0.01","h=0.03","h=0.07"), lwd=3, col=c("orange","purple", "limegreen"), cex=0.8)
+```
+Plot di atas merupakan visualisasi dari perbandingan Bandwith. Masing-masing Bandwith mempresentasikan bagaimana estimasi kepadatan dipengaruhi oleh lebar bandwidth pada plot perbandingan Kernel Density Estimation (KDE) dengan tiga bandwidth yang berbeda (h = 0.01, h = 0.03, h = 0.07) dan memiliki Bandwith optimum sebesar 0.18. Namun pada dataset yang digunakan dan dengan bandwith h = 0.01, h = 0.03, h = 0.07 tidak memiliki perbedaan gelombang yang signifikan, hal ini bisa disebabkan oleh lebar data maupun distribusi dari data.
+
+```{r}
+#perbandingan bandwidth dengan menghitung CV 
+n = length(X)
+
+h_seq = seq(from=0.01,to=1, by=0.01)
+```
+
+
+```{r}
+CV_err_h = rep(NA,length(h_seq))
+for(j in seq_along(h_seq)){
+  h_using = h_seq[j]
+  CV_err = rep(NA, n)
+  
+  for(i in seq_along(X)){
+    X_val = X[i]
+    Y_val = Y[i]
+    # validation set
+    X_tr = X[-i]
+    Y_tr = Y[-i]
+    # training set
+    Y_val_predict = ksmooth(x=X_tr,y=Y_tr,kernel = "normal",bandwidth=h_using, x.points = X_val)
+    CV_err[i] = (Y_val - Y_val_predict$y)^2
+    # we measure the error in terms of difference square
+  }
+  CV_err_h[j] = mean(CV_err)
+}
+CV_err_h
+```
+
+```{r}
+#Bandwidth Optimum
+h_opt_values=h_seq[which.min(CV_err_h)]
+h_opt_values
+```
+
+```{r}
+# plot Regresi Kernel
+library(KernSmooth)
+plot(X, Y)
+fit <- locpoly(X, Y, bandwidth = h_opt_values)
+lines(fit, col = "green", lwd = 3)
+
+# Perhitungan R-squared
+Y_pred <- fit$y
+Y_mean <- mean(Y)
+SSR <- sum((Y_mean - Y_pred)^2)
+SST <- sum((Y - Y_mean)^2)
+R_squared <- 1 - SSR / SST
+R_squared
+
+summary(fit)
+
+```
+Metode ini menghasilkan model regresi kernel yang memiliki bandwith sebesar h = 0.01, h = 0.03, h = 0.07. Kemudian didapatkan nilai R-square sebesar 0,89 yang menunjukkan bahwa variabel independen x menyumbang sekitar 89% variabilitas variabel dependen y dengan menggunakan model regresi kernel ini. Karena nilai R-square terbilang cukup tinggi, ini menunjukkan bahwa model regresi polinomial dapat menjelaskan dengan baik hubungan antara x dan y. Hal tersebut dibuktikan dengan plot yang dihasilkan, dimana plot data mengikuti garis yang dihasilkan oleh regresi kernel.
+
+
+REGRESI LINEAR SEDERHANA
+```{r}
+#Regresi Linear Sederhana
+Data=data.frame(X,Y)
+mod_linear = lm(Y~X,data=Data)
+summary(mod_linear)
+
+library(tidyverse)
+plotlin <- ggplot(Data,aes(x=X, y=Y))+
+            geom_point(color="black") +
+            stat_smooth(method = "lm", formula = y~x, col = "blue")
+plotlin
+```
+Model: y = 116.88 + (-0.103)x
+rsquare: 21%
+
+Metode ini menghasilkan model regresi dengan nilai intercept sebesar 116.881207 ketika x sama dengan 0 dan koefisien regresi sebesar 0.103087 dimana jika variabel x meningkat satu unit, itu akan menurunkan variabel y sebesar nilai koefisien. Kemudian didapatkan R-squared sebesar 0,21 yang menunjukkan bahwa variabel independen x dapat menyumbang sekitar 21% variabilitas variabel dependen y dengan menggunakan model regresi linier ini. Karena R-squared yang relatif rendah, ini menunjukkan bahwa model regresi linier ini mungkin tidak dapat menjelaskan dengan baik hubungan antara x dan y. Hal tersebut dibuktikan dengan plot yang dihasilkan, dimana plot data tidak mengikuti garis linier (berwarna bitu).
+
+
+REGRESI POLINOMIAL
+```{r}
+#Regresi Polinomial
+mod_polinomial = lm(Y ~ poly(X,9),data=Data)
+summary(mod_polinomial)
+
+library(tidyverse)
+plotpol <- ggplot(Data,aes(x=X, y=Y))+
+            geom_point(color="black") +
+            stat_smooth(method = "lm", formula = y~poly(x,9), col = "blue")
+plotpol
+```
+Model: y = (9.626e +01) + (−3.769e+02)x+(-4.074e+02)x²+(-3.822e+02)x3 + (-3.169e+02)x+(-2.452e+02)x5+ (-1.782e+02)x+(-1.180e +02)x7+ (-7.211e+01)x+(-4.078e+01)x9
+rsquare: 99%
+
+Metode ini menghasilkan model regresi polinomial berderajat 9, yang berarti bahwa prediksi y dipengaruhi oleh x hingga derajat kesembilan. Setiap koefisien menggambarkan kontribusi variabel-variabel x dengan derajat yang sesuai terhadap nilai y. Kemudian didapatkan nilai R-square sebesar 0,99 yang menunjukkan bahwa variabel independen x menyumbang sekitar 99% variabilitas variabel dependen y dengan menggunakan model regresi polinomial ini. Karena nilai R-square terbilang sangat tinggi, ini menunjukkan bahwa model regresi polinomial dapat menjelaskan dengan sangat baik hubungan antara x dan y. Hal tersebut dibuktikan dengan plot yang dihasilkan, dimana plot data mengikuti garis yang dihasilkan oleh regresi polinomial. Namun, menggunakan polinomial tingkat tinggi seperti ini dapat menyebabkan overfitting, yaitu penyesuaian model yang terlalu baik pada data pelatihan tetapi mungkin tidak generalis ke data baru.
+
+ 
+
